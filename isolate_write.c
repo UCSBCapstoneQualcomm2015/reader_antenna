@@ -99,6 +99,7 @@ int main(int argc, char ** argv)
 	char buf [1000];
 	char cmd[100];
 	char id_buf[12];
+	char hex_val_buf[10];
 	int internal_arg_counter;
 	int id_buf_index;
 	int offset;
@@ -146,34 +147,34 @@ int main(int argc, char ** argv)
 	while((ch = getopt_long(argc, argv, ARGS, longopts, &indexptr)) != -1) {
 		switch(ch) {
 			case 'r':
-				printf("Entered read command\n");
+				//printf("Entered read command\n");
 				cmdln_args.read_flag = 1;
 				cmdln_args.arg_counter+=3;
 				break;
 			case 'w':
-				printf("Entered write command\n");
+				//printf("Entered write command\n");
 				cmdln_args.write_flag = 1;
 				cmdln_args.arg_counter+=3;
 				break;
 			case 't':
 				// Not going to need isolate command, will embed with the read and write commands
-				printf("Entered tag command\n");
+				//printf("Entered tag command\n");
 				cmdln_args.tag = optarg;
 				cmdln_args.arg_counter+=2;
 				break;
 			case 'c':
-				printf("Entered content command\n");
+				//printf("Entered content command\n");
 				cmdln_args.tag = optarg;
 				cmdln_args.arg_counter++;
 				break;
 		  	case 'i':
-				printf("Entered inventory command\n");
+				//printf("Entered inventory command\n");
 				// Fill the buffer accordingly
 				cmdln_args.invent_flag = 1;
 				cmdln_args.arg_counter++;
 				break;
 		  	case 'n':
-				printf("Entered the inventory rssi command\n");
+				//printf("Entered the inventory rssi command\n");
 				// Fill buffer with RSSI inventory hex
 				cmdln_args.rssi_flag = 1;
 				cmdln_args.arg_counter++;
@@ -184,13 +185,10 @@ int main(int argc, char ** argv)
 				printf("Options:\n");
 				printf("	-r ... read command\n");
 				printf("	-w ... write command\n");
-				printf("	-t tag_id 	 tag to read and write to\n");
 				printf("	-c content	 content written to tag if write option activated\n");
-				printf("	-i ... inventory command\n");
 				printf("	-n ... inventory rssi command\n\n\n");
 				printf("Notes:\n");
-				printf("	Write command is as follows: antenna -w -t tag_id -c value_to_be_written\n");
-				printf("	Read command is as follows: antenna -r -t tag_id\n"); 
+				printf("	Write command is as follows: antenna -w -c value_to_be_written\n"); 
 				exit(0);
 				break;
 		}
@@ -226,9 +224,9 @@ int main(int argc, char ** argv)
 				n = read(fd, buf, sizeof buf);
 				if (n > 0) {
 					for (j = 0; j < n; j++) {
-						printf("0x%.2x ", buf[j]);
+						//printf("0x%.2x ", buf[j]);
 					}
-					printf("\n");
+					//printf("\n");
 				}	
 				sleep(1);
 				if (n==0) {
@@ -243,9 +241,11 @@ int main(int argc, char ** argv)
 			// Will fill in the buffer with the RFID of the tag
  			strncpy(id_buf, buf+9, 12);
  			
+ 			/*
  			for (k = 0; k < 12; k++) {
  				printf("id_buf[%d] = %x\n", k, id_buf[k]);
  			}
+ 			*/
  			internal_arg_counter += 1;
 		}
 			
@@ -257,19 +257,15 @@ int main(int argc, char ** argv)
 			cmd[1] = 0x0F;
 			cmd[2] = 0x0C;
 			strncpy(cmd+3, id_buf, 12);
-			/*
-			for (i = 0; i < 15; i++) {
-				printf("cmd[%d] = %x\n", i, cmd[i]);
-			}
-			*/
+			
 			write(fd, cmd, sizeof cmd);
 			while (1) {
 				n = read(fd, buf, sizeof buf);
 				if (n > 0) {
 					for (j = 0; j < n; j++) {
-						printf("0x%.2x ", buf[j]);
+						//printf("0x%.2x ", buf[j]);
 					}
-					printf("\n");
+					//printf("\n");
 				}	
 				sleep(1);
 				if (n==0) {
@@ -317,7 +313,7 @@ int main(int argc, char ** argv)
 			}
 			
 			if (cmdln_args.write_flag != 0) {
-				printf("In write statement\n");
+				//printf("In write statement\n");
 				// Check if there is data to be written to the tag
 				if (cmdln_args.tag == NULL) {
 					printf("No data is given to write to tag, exiting\n");
@@ -335,8 +331,24 @@ int main(int argc, char ** argv)
 				cmd[6] = 0x00;
 				cmd[7] = 0x00;
 				// Number of words written
-				cmd[8] = 0x06;
-				printf("%s\n", cmdln_args.tag);
+				cmd[8] = 0xC0;
+				
+				//printf("%s\n", cmdln_args.tag);
+				//printf("Length of string: %d\n", strlen(cmdln_args.tag));
+				
+				if (strlen(cmdln_args.tag) % 2 == 0) {
+					//printf("In even\n");
+					cmd[8] = strlen(cmdln_args.tag) / 2;
+				}
+				
+				if (strlen(cmdln_args.tag) % 2 == 1) {
+					//printf("In odd\n");
+					cmd[8] = (strlen(cmdln_args.tag) + 1) / 2;
+				}
+				
+				//printf("cmd[8] = %x\n", cmd[8]);
+				
+				
 				// If there is data to be written, parse the char and input into cmd buffer
 				strncpy(cmd+9, strtok(cmdln_args.tag, " "), 1);
 				while ((val = strtok(NULL, " ")) != NULL) {
@@ -346,18 +358,20 @@ int main(int argc, char ** argv)
 				
 				//printf("For write command: \n");
 				
-				for (i = 0; i < 21; i++) {
+				/*
+				for (i = 0; i < 30; i++) {
 					printf("cmd[%d] = %x\n", i, cmd[i]);
 				}
 				
+				*/
 				write(fd, cmd, sizeof cmd);
 				while (1) {
 					n = read(fd, buf, sizeof buf);
 					if (n > 0) {
 						for (j = 0; j < n; j++) {
-							printf("0x%.2x ", buf[j]);
+							//printf("0x%.2x ", buf[j]);
 						}
-						printf("\n");
+						//printf("\n");
 					}	
 					sleep(1);
 					if (n==0) {
@@ -369,6 +383,13 @@ int main(int argc, char ** argv)
 						break;
 					}
 				}
+				for (i = 0; i < strlen(buf); i++) {
+					if (buf[i] == 0x06) {
+						printf("True\n");
+						exit(0);
+					}
+				}
+				printf("False\n");
 			}
 		}	
 	}	
